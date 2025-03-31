@@ -8,8 +8,12 @@
 plugins {
     // Apply the Java Gradle plugin development plugin to add support for developing Gradle plugins
     `java-gradle-plugin`
+    `kotlin-dsl`
     id("javaformat")
+    alias(libs.plugins.gradlePluginPublish)
 }
+
+group = "dev.hhos.tools"
 
 repositories {
     // Use Maven Central for resolving dependencies.
@@ -28,10 +32,18 @@ dependencies {
 }
 
 gradlePlugin {
+    website = "https://github.com/nisaldb/clean-spring"
+    vcsUrl = "https://github.com/nisaldb/clean-spring"
+
     // Define the plugin
     val cleanSpring by plugins.creating {
         id = "dev.hhos.tools.cleanspring"
         implementationClass = "dev.hhos.tools.CleanSpringPlugin"
+        displayName = "A plugin to ensure spring coding style"
+        description = """
+            |This plugin will automatically apply 
+            |required gradle plugins to enforce the spring coding style""".trimMargin()
+        tags = listOf("spring", "spring-boot", "coding style")
     }
 }
 
@@ -60,3 +72,26 @@ tasks.named<Test>("test") {
     // Use JUnit Jupiter for unit tests.
     useJUnitPlatform()
 }
+
+gradle.taskGraph.whenReady {
+    if (hasTask(":plugin:publishPlugins")) {
+        check(cmd("git", "diff", "--quiet", "--exit-code").isSuccess) {
+            "Working tree is dirty"
+        }
+        val versionProcess = cmd("git", "describe", "--exact-match")
+        check(versionProcess.isSuccess) { "Version is not tagged" }
+        version = versionProcess.text.trim().removePrefix("v")
+    }
+}
+
+fun cmd(vararg cmdAndArgs: String) =
+    providers.exec {
+        isIgnoreExitValue = true
+        commandLine(*cmdAndArgs)
+    }
+
+val ExecOutput.text: String
+    get() = standardOutput.asText.get()
+
+val ExecOutput.isSuccess: Boolean
+    get() = result.get().exitValue == 0
